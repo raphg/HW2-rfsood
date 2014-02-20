@@ -44,7 +44,7 @@ top_poly <- topTable(ebay_mset, coef="treatmentPoly IC H", number=Inf, sort.by="
 sum(top_poly$adj.P.Val<0.05 & top_poly$logFC>log2(1.5))
 
 # Create expressionSet for poly IC-responsive probes only
-mset_r <- mset[top_poly$adj.P.Val<0.05 & top_poly$logFC>log(1.5),]
+mset_r <- mset[top_poly$adj.P.Val<0.05 & top_poly$logFC>log2(1.5),]
 
 # Identify differentially expressed genes between Poly IC- and mock-treated macrophages
 mm_mset_r <- model.matrix(~ptid+status, mset_r)
