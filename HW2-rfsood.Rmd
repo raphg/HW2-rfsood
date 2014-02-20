@@ -1,0 +1,60 @@
+Ravi Sood
+February 11, 2014
+BIOST 578
+Homework 2
+========================================================
+
+```{r}
+# Load necessary packages
+source("http://bioconductor.org/biocLite.R")
+biocLite("pheatmap")
+library(GEOquery)
+library(limma)
+library(pheatmap)
+
+# Download the data
+gds <- getGEO("GSE40812", destdir = "Data/GEO/")
+gset <- gds[[1]]
+pd <- pData(gset)
+
+# Clean up the pData
+keepcols <- c("title", "source_name_ch1", "characteristics_ch1", "characteristics_ch1.2")
+pd_clean <- pd[, keepcols]
+colnames(pd_clean) <- c("ptid", "cell_type", "status", "treatment")
+pd_clean$ptid <- gsub("^.{3,4}_", "", pd_clean$ptid)
+pd_clean$ptid <- gsub("\\D", "", pd_clean$ptid)
+pd_clean$cell_type <- gsub(".* ", "", pd_clean$cell_type)
+pd_clean$status <- gsub(".*: ", "", pd_clean$status)
+pd_clean$treatment <- gsub(".*: ", "", pd_clean$treatment)
+gset_clean <- gset
+pData(gset_clean) <- pd_clean
+
+# Create ExpressionSet for macrophage data only
+mpd <- pd_clean[pd_clean$cell_type=="Macrophage",]
+mset <- gset_clean[, rownames(mpd)]
+pData(mset) <- mpd
+
+# Identify differentially expressed genes between Poly IC- and mock-treated macrophages
+mm_mset <- model.matrix(~ptid+treatment, mset)
+fit_mset <- lmFit(mset, mm_mset)
+ebay_mset <- eBayes(fit_mset)
+top_poly <- topTable(ebay_mset, coef="treatmentPoly IC H", number=Inf, sort.by="none")
+
+# Display number of differentially expressed probes using FDR of 0.05 and FC > 1.5
+sum(top_poly$adj.P.Val<0.05 & top_poly$logFC>log2(1.5))
+
+# Create expressionSet for poly IC-responsive probes only
+mset_r <- mset[top_poly$adj.P.Val<0.05 & top_poly$logFC>log(1.5),]
+
+# Identify differentially expressed genes between Poly IC- and mock-treated macrophages
+mm_mset_r <- model.matrix(~ptid+status, mset_r)
+fit_mset_r <- lmFit(mset, mm_mset_r)
+ebay_mset_r <- eBayes(fit_mset_r)
+top_poly_r <- topTable(ebay_mset_r, coef="treatmentPoly IC H", number=Inf, sort.by="none")
+
+sum(top_poly_r$adj.P.Val<0.1)
+
+
+
+
+```
