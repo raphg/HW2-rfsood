@@ -4,13 +4,17 @@ BIOST 578
 Homework 2
 ========================================================
 
+First, load the necessary packages:
 ```{r}
-# Load necessary packages
-source("http://bioconductor.org/biocLite.R")
-biocLite("pheatmap")
 library(GEOquery)
 library(limma)
-library(pheatmap)
+library(data.table)
+```
+
+Next, download the data from GEO and clean up the pData:
+```{r}
+# Set working directory
+setwd("/Users/ravi/Documents/2013-2015 - Graduate School/BIOST 578/")
 
 # Download the data
 gds <- getGEO("GSE40812", destdir = "Data/GEO/")
@@ -28,33 +32,69 @@ pd_clean$status <- gsub(".*: ", "", pd_clean$status)
 pd_clean$treatment <- gsub(".*: ", "", pd_clean$treatment)
 gset_clean <- gset
 pData(gset_clean) <- pd_clean
+```
 
+Looking at the macrophage samples only, identify probe sets differentially expressed in response to poly IC treatment:
+```{r}
 # Create ExpressionSet for macrophage data only
 mpd <- pd_clean[pd_clean$cell_type=="Macrophage",]
 mset <- gset_clean[, rownames(mpd)]
 pData(mset) <- mpd
 
-# Identify differentially expressed genes between Poly IC- and mock-treated macrophages
-mm_mset <- model.matrix(~ptid+treatment, mset)
+# Identify differentially expressed probe sets between Poly IC- and mock-treated macrophages
+mm_mset <- model.matrix(~treatment, mset)
 fit_mset <- lmFit(mset, mm_mset)
 ebay_mset <- eBayes(fit_mset)
 top_poly <- topTable(ebay_mset, coef="treatmentPoly IC H", number=Inf, sort.by="none")
 
-# Display number of differentially expressed probes using FDR of 0.05 and FC > 1.5
-sum(top_poly$adj.P.Val<0.05 & top_poly$logFC>log2(1.5))
+# Display number of differentially expressed probe sets using FDR of 0.05 and FC > 1.5
+sum(top_poly$adj.P.Val<0.05 & abs(top_poly$logFC)>log2(1.5))
+```
 
-# Create expressionSet for poly IC-responsive probes only
-mset_r <- mset[top_poly$adj.P.Val<0.05 & top_poly$logFC>log2(1.5),]
+This returns 1146 poly IC-responsive probe sets. 
 
-# Identify differentially expressed genes between Poly IC- and mock-treated macrophages
-mm_mset_r <- model.matrix(~ptid+status, mset_r)
-fit_mset_r <- lmFit(mset, mm_mset_r)
+Next, look for differential expression of these probe poly IC-responsive sets based on HCV status:
+```{r}
+# Create expressionSet for poly IC-responsive probe sets only
+mset_r <- mset[top_poly$adj.P.Val<0.05 & abs(top_poly$logFC)>log2(1.5),]
+
+# Of the poly IC-responsive probe sets, identify those differentially expressed between HCV+ and HCV- subjects
+mm_mset_r <- model.matrix(~treatment+status, mset_r)
+fit_mset_r <- lmFit(mset_r, mm_mset_r)
 ebay_mset_r <- eBayes(fit_mset_r)
-top_poly_r <- topTable(ebay_mset_r, coef="treatmentPoly IC H", number=Inf, sort.by="none")
+top_poly_r <- topTable(ebay_mset_r, coef="statusPos", number=Inf, sort.by="none")
 
-sum(top_poly_r$adj.P.Val<0.1)
+# As no probe sets are differentially expressed using adjusted p values and FDR <0.05, display the number of differentially expressed probe sets using unadjusted p < 0.05
+sum(top_poly_r$P.Value<0.05)
+```
 
+This analysis returns 36 poly IC-responsive probe sets differentially expressed between HCV+ and HCV- macrophages. 
 
+Finally, construct a heatmap demonstrating the differential expression of these 36 probe sets among the four groups of samples [mock-treated & HCV(-), mock-treated & HCV(+), poly IC-treated & HCV(-), and poly IC-treated & HCV(+); n = 10/group]:
+```{r}
+# Create expressionSet for differentially expressed probe sets only
+finalset <- mset_r[top_poly_r$P.Value<0.05,]
 
+# Store the column order for heatmap by sorting by 1) treatment, 2) HCV status, and then 3) subject ID
+finalpd <- pData(finalset)
+finalpd_sorted <- finalpd[order(finalpd$treatment, finalpd$status, finalpd$ptid), ]
+hmcolorder <- rownames(finalpd_sorted)
 
+# Store the column names for the heatmap (i.e., ordered subject IDs after sorting first by treatment and then by HCV status)
+hmcolnames <- finalpd_sorted$ptid
+
+# Create a matrix of expression values where each row is a probe and each column is a sample
+hmdata <- exprs(finalset)
+
+# Sort the columns according to 1) treatment 2) HCV status 3) subject ID
+hmdt <- as.data.table(hmdata)
+rownames(hmdt) <- rownames(hmdata)
+setcolorder(hmdt, hmcolorder)
+hmdata <- data.matrix(hmdt)
+
+# Use subject IDs for column names
+colnames(hmdata) <- hmcolnames
+
+# Draw the heatmap
+heatmap(hmdata, Colv=NA)
 ```
