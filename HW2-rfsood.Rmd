@@ -51,7 +51,7 @@ top_poly <- topTable(ebay_mset, coef="treatmentPoly IC H", number=Inf, sort.by="
 sum(top_poly$adj.P.Val<0.05 & abs(top_poly$logFC)>log2(1.5))
 ```
 
-This returns 1146 poly IC-responsive probe sets. 
+This returns 1146 poly IC-responsive probe sets, which agrees exactly with what is presented in the paper.
 
 Next, look for differential expression of these probe poly IC-responsive sets based on HCV status:
 ```{r}
@@ -64,11 +64,11 @@ fit_mset_r <- lmFit(mset_r, mm_mset_r)
 ebay_mset_r <- eBayes(fit_mset_r)
 top_poly_r <- topTable(ebay_mset_r, coef="statusPos", number=Inf, sort.by="none")
 
-# As no probe sets are differentially expressed using adjusted p values and FDR <0.05, display the number of differentially expressed probe sets using unadjusted p < 0.05
-sum(top_poly_r$P.Value<0.05)
+# As no probe sets are differentially expressed using adjusted p values and FDR <0.05, display the number of differentially expressed probe sets using unadjusted p < 0.1, as was done in the paper
+sum(top_poly_r$P.Value<0.1)
 ```
 
-This analysis returns 36 poly IC-responsive probe sets differentially expressed between HCV+ and HCV- macrophages. 
+This analysis returns 89 poly IC-responsive probe sets differentially expressed between HCV+ and HCV- macrophages. I believe this number differs from the 43 reported in the paper because I did not do a paired analysis comparing each subject's mock- and poly IC-treated sample as they did in the paper. Since I consequently have a higher number of differentially expressed probe sets, I will use a more stringent cutoff of p < 0.05, which results in 36 differentially expressed probe sets, closer to the number (43) shown in the heatmap in the paper.
 
 Finally, construct a heatmap demonstrating the differential expression of these 36 probe sets among the four groups of samples [mock-treated & HCV(-), mock-treated & HCV(+), poly IC-treated & HCV(-), and poly IC-treated & HCV(+); n = 10/group]:
 ```{r}
